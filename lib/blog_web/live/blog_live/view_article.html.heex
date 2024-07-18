@@ -1,0 +1,91 @@
+<div class="flex flex-row justify-between">
+  <div class="flex flex-col gap-y-8 w-3/4 mx-auto">
+    <div :if={@live_action in [:show, :comments]} class="flex flex-row justify-between">
+      <div class="flex flex-row gap-x-4">
+        <.link
+          class="rounded border px-2 py-1 border-gray-300 text-lg hover:bg-purple-300 transition duration-300"
+          patch={~p"/articles/#{@article.id}/edit"}
+        >
+          Edit
+        </.link>
+        <button
+          class="rounded border px-2 py-1 border-gray-300 text-lg hover:bg-red-300 transition duration-300"
+          phx-click="delete_article"
+          data-confirm={"Deleting '#{@article.title}'! Are you sure?"}
+        >
+          Delete
+        </button>
+      </div>
+      <.link
+        :if={!@comments}
+        class="rounded border px-2 py-1 border-gray-300 text-lg hover:bg-blue-300 transition duration-300"
+        patch={~p"/articles/#{@article.id}/comments"}
+      >
+        Comments
+      </.link>
+    </div>
+
+    <article
+      :if={@live_action == :edit}
+      class="flex flex-col gap-y-4 border border-gray-300 rounded p-4 w-fit min-w-96"
+    >
+      <h1 class="font-bold text-xl"><%= @changeset.changes[:title] || @article.title %></h1>
+      <p class="whitespace-pre-line text-lg"><%= @changeset.changes[:body] || @article.body %></p>
+    </article>
+    <article
+      :if={@live_action != :edit}
+      class="flex flex-col gap-y-4 border border-gray-300 rounded p-4 "
+    >
+      <h1 class="font-bold text-xl"><%= @article.title %></h1>
+      <p class="whitespace-pre-line text-lg"><%= @article.body %></p>
+    </article>
+  </div>
+  <.form
+    :if={@live_action == :edit}
+    for={@changeset}
+    class="flex flex-col gap-y-4 w-1/3 ml-8"
+    phx-submit="submit_article"
+    phx-change="edit_article"
+  >
+    <.input phx-debounce={150} field={@form[:title]} placeholder="Title" />
+    <.input phx-debounce={150} type="textarea" field={@form[:body]} placeholder="Body" />
+    <div class="flex flex-row gap-x-2 justify-center items-center">
+      <.button>Publish edit</.button>
+      <.link
+        class="rounded-lg border-gray-300 border hover:bg-red-300 transition px-4 py-1.5 bg-red-100"
+        patch={~p"/articles/#{@article.id}"}
+      >
+        Cancel
+      </.link>
+    </div>
+  </.form>
+
+  <div
+    :if={@comments && @live_action in [:show, :comments]}
+    class="ml-8 w-1/4 gap-y-4 flex flex-col"
+  >
+    <.form
+      for={@changeset}
+      class="flex flex-col gap-y-2"
+      phx-submit="submit_comment"
+      phx-change="change_comment"
+    >
+      <.input phx-debounce={150} field={@form[:commenter]} placeholder="Nickname" />
+      <.input phx-debounce={150} type="textarea" field={@form[:body]} placeholder="Body" />
+      <.button class="w-1/4 self-center transition">Comment</.button>
+    </.form>
+    <ul class="gap-y-4 flex flex-col">
+      <li
+        :for={comment <- @comments}
+        class="min-h-12 rounded border border-gray-300 px-4 py-2 relative"
+      >
+        <button phx-click="delete_comment" value={comment.id} class="absolute right-2 top-1">
+          X
+        </button>
+        <h3 class="font-semibold"><%= comment.commenter %></h3>
+        <hr />
+        <p class="whitespace-pre-line"><%= comment.body %></p>
+      </li>
+    </ul>
+  </div>
+</div>
