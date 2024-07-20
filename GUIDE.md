@@ -1,6 +1,3 @@
-
-
-
 > Hey, this guide is meant to elaborate on [Phoenix LiveView](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html) that wasn't talked over in [Getting started with Elixir Phoenix](https://www.linkedin.com/pulse/unofficial-getting-started-elixir-phoenix-guide-andy-klimczak-uhllc/) by [Andy Klimczak](https://www.linkedin.com/in/andyklimczak/). This article will leverage itself  on Andy's which itself is based on the [Getting Started with Rails Guide](https://guides.rubyonrails.org/getting_started.html). All the credit goes to Andy and the writer of that Rails guide.
 
 > This guide aims to go over starting a simple Article/Comments blog  from scratch using LiveView and it's rich functionality.
@@ -189,7 +186,7 @@ defmodule BlogWeb.BlogLive.Article do
   end
 end
 ```
-Now for our template you can either use the `def render(assigns)` callback or create a template file with a snake_cased module name like `article.html.heex` (so for module name like ArticleFollowersLive, the template would be `article_followers.html.heex`):
+Now for our template you can either use the `def render(assigns)` callback or create a template file with a file name derived from snake_cased Module name of `article.ex` like `article.html.heex` (so for module name like ArticleFollowers, the template would be `article_followers.html.heex`):
 ``` elixir
 # The render callback
 def render(assigns) do
@@ -354,7 +351,7 @@ iex(5)> article
     updated_at: ~U[2024-07-14 09:55:11Z]
   }
 ```
-The id, created_at, and updated_at attributes of the object are now set. Phoenix did this for us when we saved the object.
+The `id`, `created_at`, and `updated_at` attributes of the object are now set. Phoenix did this for us when we saved the struct.
 
 When we want to fetch this article from the database, we can call find on the model and pass the id as an argument:
 
@@ -439,7 +436,7 @@ defmodule BlogWeb.BlogLive.Article do
 end
 ```
 
-We retrieved the articles from the database using our list_articles function, then assigned them reversed  to our socket's assigns, which we can later access in our template directly with @assigned_name like @articles.
+We retrieved the articles from the database using our list_articles function, then assigned them reversed to our socket's assigns, which we can later access in our template directly with @assigned_name like @articles.
 
 Let's update our template to show the titles of our articles in `lib/blog_web/live/blog_live/article.html.heex`:
 ```elixir
@@ -454,7 +451,7 @@ Let's update our template to show the titles of our articles in `lib/blog_web/li
 </ul>
 ```
 
-Here we use the `:for` which is a syntax sugar for `<%= for .. do %>` to loop over the @articles assign and display every article's title.
+Here we use the [:for](https://hexdocs.pm/phoenix/components.html#html-extensions) which is a syntax sugar for `<%= for .. do %>` to loop over the @articles assign and display every article's title.
 
 Navigate to  [http://localhost:4000](http://localhost:4000/)  and see the articles we've created so far.
 
@@ -579,7 +576,7 @@ The [<.link>](https://hexdocs.pm/phoenix_live_view/Phoenix.Component.html#link/1
 
 In LiveView, the 'C' (Create) of CRUD is streamlined into a more fluid, real-time process. Unlike traditional web applications that often require multiple page loads, LiveView allows the entire creation process to occur within a single view, updating dynamically.
 
-First let's add two new alias functions change_article and create_article to the context:
+First let's add a new alias function `change_article/2`to the context:
 ```elixir
 # lib/blog/my_blog.ex
 defmodule Blog.MyBlog do
@@ -596,7 +593,6 @@ defmodule Blog.MyBlog do
   end
 
   defdelegate change_article(article, changes), to: Article, as: :changeset
-  defdelegate create_article(changeset), to: Repo, as: :insert
 end
 ```
 Then we'll add two handle_params callbacks inside our article index. One that matches the `:new` live_action and the second one that just matches all other cases. Inside the `:new` handle_params we create an article changeset from params and assign it.
@@ -604,15 +600,17 @@ Then we'll add two handle_params callbacks inside our article index. One that ma
 ```elixir
 # lib/blog_web/live/blog_live/article.ex
 defmodule BlogWeb.BlogLive.Article do
-  alias Blog.MyBlog.Article
   use BlogWeb, :live_view
+  alias Blog.MyBlog.Article
   alias Blog.MyBlog
 
   def handle_params(params, _url, %{assigns: %{live_action: :new}} = socket) do
-    changeset = MyBlog.change_article(%Article{}, params)
-    form = to_form(changeset, action: :validate)
-    socket = socket |> assign(:changeset, changeset) |> assign(:form, form)
-    {:noreply, socket}
+	   form =
+	     %Article{}
+	     |> MyBlog.change_article(params)
+	     |> to_form(action: :validate)
+
+    {:noreply, assign(socket, :form, form)}
   end
 
   def handle_params(_params, _url, socket) do
@@ -637,7 +635,7 @@ Then let's create a form for adding new articles
 
 <.form
   :if={@live_action == :new}
-  for={@changeset}
+  for={@form}
   phx-submit="submit_article"
   phx-change="edit_article"
 >
@@ -652,19 +650,21 @@ Then let's create a form for adding new articles
   </li>
 </ul>
 ```
-The `phx-debounce` on every input is a timeout value before event gets sent after user stops typing. Then, we use the `phx-submit` and `phx-change` events, that will trigger the appropriate callbacks. So let's add them:
+The [`phx-debounce`](https://hexdocs.pm/phoenix_live_view/bindings.html#rate-limiting-events-with-debounce-and-throttle)
+  on every input is a timeout value before event gets sent after user stops typing. Then, we use the `phx-submit` and `phx-change` events, that will trigger the appropriate callbacks. So let's add them:
 ```elixir
 # lib/blog_web/live/blog_live/article.ex
 defmodule BlogWeb.BlogLive.Article do
-  alias Blog.MyBlog.Article
   use BlogWeb, :live_view
+  alias Blog.MyBlog.Article
   alias Blog.MyBlog
+  alias Blog.Repo
 
   def handle_event("submit_article", _params, socket) do
-    changeset = socket.assigns.changeset
-
+		changeset = Map.put(socket.assigns.form.source, :action, :insert)
+		
     socket =
-      case MyBlog.create_article(changeset) do
+      case Repo.insert(changeset) do
         {:ok, article} ->
           socket
           |> put_flash(:info, "Article created successfully.")
@@ -684,10 +684,12 @@ defmodule BlogWeb.BlogLive.Article do
   end
 
   def handle_params(params, _url, %{assigns: %{live_action: :new}} = socket) do
-    changeset = MyBlog.change_article(%Article{}, params)
-    form = to_form(changeset, action: :validate)
-    socket = socket |> assign(:changeset, changeset) |> assign(:form, form)
-    {:noreply, socket}
+    form =
+      %Article{}
+      |> MyBlog.change_article(params)
+      |> to_form(action: :validate)
+
+    {:noreply, assign(socket, :form, form)}
   end
 
   def handle_params(_params, _url, socket) do
@@ -702,7 +704,7 @@ defmodule BlogWeb.BlogLive.Article do
 end
 ```
 
-The `edit_article` receives the params based on our input names and values. We match the title and body, then put them inside our url via `push_patch` which triggers the `handle_params` essentially creating and assigning a new article changeset. Then the `submit_article` which is triggered by form submit, attempts to create the article. In case of success it displays a [flash message](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html#put_flash/3) with success, prepends the new article to the articles assign without having to retrieve them from database again and returns us to the `:index` live_action. On failure we don't have to do much aside of displaying a failure message via flash.
+The `edit_article` receives the params based on our input names and values. We match the title and body, then put them inside our url via `push_patch` which triggers the `handle_params` essentially creating and assigning a new form with `:validate` action that contains the article changeset. Then the `submit_article` which is triggered by form submit, attempts to create the article from the changeset inside the form with `:insert` action. In case of success it displays a [flash message](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html#put_flash/3) with success, prepends the new article to the articles assign without having to retrieve them from database again and returns us to the `:index` live_action. On failure we don't have to do much aside of displaying a failure message via flash.
 
 #### 7.3.1 Validations and Displaying Error Messages
 Try creating a new article without a title or body. You should see `can't be blank` error messages under the title input and body input. These validations for the article `title` and `body` field were created for us in the schema that was generated when we ran `mix phx.gen.schema`. Open `lib/blog/my_blog/article.ex` and notice the usage of `validate_required` in the `changeset` function:
@@ -794,29 +796,7 @@ We can now create an article by visiting [http://localhost:4000/articles/new](ht
 
 We've covered the "CR" of CRUD. Now let's move on to the "U" (Update). Updating a resource is very similar to creating a resource. The user opens a form, edits the data, and once it's validated, submits it.
 
-Let's start by adding a simple update alias function to our context:
-```elixir
-# lib/blog/my_blog.ex
-defmodule Blog.MyBlog do
-  alias Blog.MyBlog.Article
-  alias Blog.Repo
-  alias Blog.MyBlog.ArticleQueries
-
-  def list_articles() do
-    ArticleQueries.base() |> Repo.all()
-  end
-
-  def get_article_by_id(id) do
-    ArticleQueries.with_id(id) |> Repo.one()
-  end
-
-  defdelegate change_article(article, changes), to: Article, as: :changeset
-  defdelegate create_article(changeset), to: Repo, as: :insert
-  defdelegate update_article(changeset), to: Repo, as: :update
-end
-```
-
-Now to get to actual editing let's add a new route action to our ViewArticle LiveView that will handle the editing:
+Let's start by adding a new route action to our ViewArticle LiveView that will handle the editing:
 ```elixir
 # lib/blog_web/router.ex
   scope "/", BlogWeb do
@@ -834,18 +814,19 @@ Now to get to actual editing let's add a new route action to our ViewArticle Liv
 ```
 You might notice that we have also added scope for "/articles", this just lets us avoid adding the "/articles" to every route inside the scope.
 
-Now adding edit option in our LiveView is very similar to what we did in create. Instead of calling `create_article` we do `update_article` and re-assign our article on success:
+Now adding edit option in our LiveView is very similar to what we did in create. Instead of calling `Repo.insert` we do `Repo.update` and re-assign our article on success:
 ```elixir
 # lib/blog_web/live/blog_live/view_article.ex
 defmodule BlogWeb.BlogLive.ViewArticle do
   use BlogWeb, :live_view
   alias Blog.MyBlog
+  alias Blog.Repo
 
   def handle_event("submit_article", _params, socket) do
-    changeset = socket.assigns.changeset
+    changeset = Map.put(socket.assigns.form.source, :action, :update)
 
     socket =
-      case MyBlog.update_article(changeset) do
+      case Repo.update(changeset) do
         {:ok, article} ->
           socket
           |> put_flash(:info, "Article edited successfully.")
@@ -865,10 +846,12 @@ defmodule BlogWeb.BlogLive.ViewArticle do
   end
 
   def handle_params(params, _url, %{assigns: %{live_action: :edit, article: article}} = socket) do
-    changeset = MyBlog.change_article(article, params)
-    form = to_form(changeset, action: :validate)
-    socket = socket |> assign(:changeset, changeset) |> assign(:form, form)
-    {:noreply, socket}
+    form =
+      article
+      |> MyBlog.change_article(params)
+      |> to_form(action: :validate)
+
+    {:noreply, assign(socket, :form, form)}
   end
 
   def handle_params(_params, _url, socket) do
@@ -896,7 +879,7 @@ The form inside template stays exact same as inside the article index. I also ad
 <!-- lib/blog_web/live/blog_live/view_article.html.heex -->
 <.form
   :if={@live_action == :edit}
-  for={@changeset}
+  for={@form}
   phx-submit="submit_article"
   phx-change="edit_article"
 >
@@ -911,38 +894,18 @@ The form inside template stays exact same as inside the article index. I also ad
 And that's it, as shrimple as that! We can now edit the article.
 
 ### 7.5 Deleting an Article
-Finally, we arrive at the "D" (Delete) of CRUD. Deleting a resource is a simpler process than creating or updating. Let's begin by adding an alias to delete an article:
-```elixir
-# lib/blog/my_blog.ex
-defmodule Blog.MyBlog do
-  alias Blog.MyBlog.Article
-  alias Blog.Repo
-  alias Blog.MyBlog.ArticleQueries
+Finally, we arrive at the "D" (Delete) of CRUD. Deleting a resource is a simpler process than creating or updating.
 
-  def list_articles() do
-    ArticleQueries.base() |> Repo.all()
-  end
-
-  def get_article_by_id(id) do
-    ArticleQueries.with_id(id) |> Repo.one()
-  end
-
-  defdelegate change_article(article, changes), to: Article, as: :changeset
-  defdelegate create_article(changeset), to: Repo, as: :insert
-  defdelegate update_article(changeset), to: Repo, as: :update
-  defdelegate delete_article(article), to: Repo, as: :delete
-end
-```
-Then we add a button with client-side confirmation using `data-confirm` and a handle_event callback:
+Let's add a button with client-side confirmation using `data-confirm` and a handle_event callback:
 ```elixir
 # lib/blog_web/live/blog_live/view_article.ex 
 defmodule BlogWeb.BlogLive.ViewArticle do
   use BlogWeb, :live_view
   alias Blog.MyBlog
 
-  def handle_event("delete_article", _params, socket) do
+	def handle_event("delete_article", _params, socket) do
     article = socket.assigns.article
-    {:ok, _article} = MyBlog.delete_article(article)
+    {:ok, _article} = Repo.delete(article)
 
     socket =
       socket
@@ -953,10 +916,10 @@ defmodule BlogWeb.BlogLive.ViewArticle do
   end
 
   def handle_event("submit_article", _params, socket) do
-    changeset = socket.assigns.changeset
+    changeset = Map.put(socket.assigns.form.source, :action, :update)
 
-    socket =lib/blog_web/live/blog_live/view_article.ex
-      case MyBlog.update_article(changeset) do
+    socket =
+      case Repo.update(changeset) do
         {:ok, article} ->
           socket
           |> put_flash(:info, "Article edited successfully.")
@@ -976,11 +939,14 @@ defmodule BlogWeb.BlogLive.ViewArticle do
   end
 
   def handle_params(params, _url, %{assigns: %{live_action: :edit, article: article}} = socket) do
-    changeset = MyBlog.change_article(article, params)
-    form = to_form(changeset, action: :validate)
-    socket = socket |> assign(:changeset, changeset) |> assign(:form, form)
-    {:noreply, socket}
+    form =
+      article
+      |> MyBlog.change_article(params)
+      |> to_form(action: :validate)
+
+    {:noreply, assign(socket, :form, form)}
   end
+
 
   def handle_params(_params, _url, socket) do
     {:noreply, socket}
@@ -1122,12 +1088,6 @@ Go ahead and run the migration:
 ```mix ecto.migrate```
 Phoenix is smart enough to only execute the migrations that have not already been run against the current database, so in this case you will just see:
 ```elixir
-19:34:36.984 [info] == Running 20240714093903 Blog.Repo.Migrations.CreateArticles.change/0 forward
-
-19:34:36.986 [info] create table articles
-
-19:34:36.993 [info] == Migrated 20240714093903 in 0.0s
-
 19:34:37.020 [info] == Running 20240716162307 Blog.Repo.Migrations.CreateComments.change/0 forward
 
 19:34:37.020 [info] create table comments
@@ -1325,9 +1285,6 @@ defmodule Blog.MyBlog do
   end
 
   defdelegate change_article(article, changes), to: Article, as: :changeset
-  defdelegate create_article(changeset), to: Repo, as: :insert
-  defdelegate update_article(changeset), to: Repo, as: :update
-  defdelegate delete_article(article), to: Repo, as: :delete
 
   def list_comments(limit \\ 10) do
     CommentQueries.base() |> Repo.all(limit: limit)
@@ -1342,9 +1299,6 @@ defmodule Blog.MyBlog do
   end
 
   defdelegate change_comment(comment, changes), to: Comment, as: :changeset
-  defdelegate create_comment(changeset), to: Repo, as: :insert
-  defdelegate update_comment(changeset), to: Repo, as: :update
-  defdelegate delete_comment(comment), to: Repo, as: :delete
 end
 ```
 Now let's add comments live_action to our ViewArticle LiveView:
@@ -1366,27 +1320,31 @@ Now we'll add handle_params for our `:comments` action and events needed to hand
 ```elixir
 # lib/blog_web/live/blog_live/view_article.ex
 defmodule BlogWeb.BlogLive.ViewArticle do
-  alias Blog.MyBlog.Comment
   use BlogWeb, :live_view
+  alias Blog.MyBlog.Comment
   alias Blog.MyBlog
+  alias Blog.Repo
 
  ...
+ 
   def handle_event("delete_comment", %{"value" => id}, socket) do
+    case MyBlog.get_comment_by_id(id) do
+      nil -> :ok
+      comment -> Repo.delete(comment)
+    end
+
     comments =
-      socket.assigns.comments
-      |> Enum.reject(fn comment ->
-        unless to_string(comment.id) != id, do: MyBlog.delete_comment(comment)
-      end)
+      socket.assigns.comments |> Enum.reject(&(to_string(Map.get(&1, :id)) == id)) |> dbg
 
     {:noreply, assign(socket, :comments, comments)}
   end
 
   def handle_event("submit_comment", _params, socket) do
     article = socket.assigns.article
-    changeset = socket.assigns.changeset
+    changeset = Map.put(socket.assigns.form.source, :action, :insert)
 
     socket =
-      case MyBlog.create_comment(changeset) do
+      case Repo.insert(changeset) do
         {:ok, comment} ->
           socket
           |> put_flash(:info, "Comment created!")
@@ -1412,10 +1370,12 @@ defmodule BlogWeb.BlogLive.ViewArticle do
   end
 
   def handle_params(params, _url, %{assigns: %{live_action: :edit, article: article}} = socket) do
-    changeset = MyBlog.change_article(article, params)
-    form = to_form(changeset, action: :validate)
-    socket = socket |> assign(:changeset, changeset) |> assign(:form, form)
-    {:noreply, socket}
+    form =
+      article
+      |> MyBlog.change_article(params)
+      |> to_form(action: :validate)
+
+    {:noreply, assign(socket, :form, form)}
   end
 
   def handle_params(
@@ -1432,17 +1392,12 @@ defmodule BlogWeb.BlogLive.ViewArticle do
         _url,
         %{assigns: %{live_action: :comments, article: article}} = socket
       ) do
-    changeset =
-      MyBlog.change_comment(%Comment{}, Map.put(params, "article_id", article.id))
+    form =
+      %Comment{}
+      |> MyBlog.change_comment(Map.put(params, "article_id", article.id))
+      |> to_form(action: :validate)
 
-    form = to_form(changeset, action: :validate)
-
-    socket =
-      socket
-      |> assign(:changeset, changeset)
-      |> assign(:form, form)
-
-    {:noreply, socket}
+    {:noreply, assign(socket, :form, form)}
   end
 
   def handle_params(_params, _url, socket) do
@@ -1474,7 +1429,7 @@ Now all we have to do is render our comments/form and add a `.link` for viewing 
 <!-- lib/blog_web/live/blog_live/view_article.ex -->
 <.form
   :if={@live_action == :edit}
-  for={@changeset}
+  for={@form}
   phx-submit="submit_article"
   phx-change="edit_article"
 >
@@ -1493,7 +1448,7 @@ Now all we have to do is render our comments/form and add a `.link` for viewing 
 <p><%= @article.body %></p>
 
 <div :if={@live_action == :comments}>
-  <.form for={@changeset} phx-submit="submit_comment" phx-change="change_comment">
+  <.form for={@form} phx-submit="submit_comment" phx-change="change_comment">
     <.input phx-debounce={150} field={@form[:commenter]} label="Nickname" />
     <.input phx-debounce={150} field={@form[:body]} label="Body" />
     <.button>Publish</.button>
@@ -1522,8 +1477,8 @@ Now that we have articles and comments working, let's make it less-awful looking
 <div class="flex flex-row justify-between gap-x-10">
   <div :if={@live_action == :new} class="flex flex-col gap-y-8 w-2/3 flex-wrap">
     <h1 class="text-lg text-brand">Preview</h1>
-    <h2 class="font-bold text-2xl"><%= @changeset.changes[:title] %></h2>
-    <p class="text-lg whitespace-pre-line"><%= @changeset.changes[:body] %></p>
+    <h2 class="font-bold text-2xl"><%= @form.source.changes[:title] %></h2>
+    <p class="text-lg whitespace-pre-line"><%= @form.source.changes[:body] %></p>
   </div>
   <ul
     :if={@live_action == :index}
@@ -1544,7 +1499,7 @@ Now that we have articles and comments working, let's make it less-awful looking
   </ul>
   <.form
     :if={@live_action == :new}
-    for={@changeset}
+    for={@form}
     class="w-1/3 flex flex-col gap-y-2 mt-8"
     phx-submit="submit_article"
     phx-change="edit_article"
@@ -1588,8 +1543,11 @@ Now that we have articles and comments working, let's make it less-awful looking
       :if={@live_action == :edit}
       class="flex flex-col gap-y-4 border border-gray-300 rounded p-4 w-fit min-w-96"
     >
-      <h1 class="font-bold text-xl"><%= @changeset.changes[:title] || @article.title %></h1>
-      <p class="whitespace-pre-line text-lg"><%= @changeset.changes[:body] || @article.body %></p>
+      <h1 class="font-bold text-xl"><%= @form.source.changes[:title] || @article.title %></h1>
+      <p class="whitespace-pre-line text-lg">
+        <%= @form.source.changes[:body] || @article.body %>
+      </p>
+
     </article>
     <article
       :if={@live_action != :edit}
@@ -1601,7 +1559,7 @@ Now that we have articles and comments working, let's make it less-awful looking
   </div>
   <.form
     :if={@live_action == :edit}
-    for={@changeset}
+    for={@form}
     class="flex flex-col gap-y-4 w-1/3 ml-8"
     phx-submit="submit_article"
     phx-change="edit_article"
@@ -1624,7 +1582,7 @@ Now that we have articles and comments working, let's make it less-awful looking
     class="ml-8 w-1/4 gap-y-4 flex flex-col"
   >
     <.form
-      for={@changeset}
+      for={@form}
       class="flex flex-col gap-y-2"
       phx-submit="submit_comment"
       phx-change="change_comment"
@@ -1652,12 +1610,12 @@ Now that we have articles and comments working, let's make it less-awful looking
 
 ## 10 Handle Asyncs
 But what if the data that we load comes from an external API that's really slow and we want to load the whole page without waiting for it? This is where LiveViews `start_async` and `async_assign` come in hand.
-Let's use the `start_async` which uses `handle_async` callback first. In our main `article.ex` instead of loading articles directly inside mount, we will call the `start_async` and add a 2 second delay to simulate slow loading:
+Let's use the [`start_async`](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html#start_async/4) which uses [`handle_async`](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html#c:handle_async/3) callback first. In our main `article.ex` instead of loading articles directly inside mount, we will call the `start_async` and add a 2 second delay to simulate slow loading:
 ```elixir
-	defmodule BlogWeb.BlogLive.Article do
+defmodule BlogWeb.BlogLive.Article do
+  use BlogWeb, :live_view
   alias Phoenix.LiveView.AsyncResult
   alias Blog.MyBlog.Article
-  use BlogWeb, :live_view
   alias Blog.MyBlog
 
   ...
@@ -1670,7 +1628,7 @@ Let's use the `start_async` which uses `handle_async` callback first. In our mai
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(:articles, AsyncResult.loading())
+      |> assign(:articles, AsyncResult.ok([]) |> AsyncResult.loading())
       |> start_async(:load_articles, fn ->
         :timer.sleep(2_000)
         MyBlog.list_articles()
@@ -1719,7 +1677,7 @@ A different approach to this would be using the `assign_async`. This doesn't tri
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(:articles, AsyncResult.loading())
+      |> assign(:articles, AsyncResult.ok([]) |> AsyncResult.loading())
       |> assign_async(:articles, fn -> {:ok, %{articles: list_with_delay()}} end)
 
     {:ok, socket}
@@ -1730,4 +1688,3 @@ The assign_async creates AsyncResult struct itself. So we don't have to declare 
 ```elixir
 assign_async([:articles, :images], fn -> {:ok, %{articles: list_with_delay(), images: load_images()}} end)
 ```
-
