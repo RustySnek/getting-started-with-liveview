@@ -29,8 +29,10 @@
       :if={@live_action == :edit}
       class="flex flex-col gap-y-4 border border-gray-300 rounded p-4 w-fit min-w-96"
     >
-      <h1 class="font-bold text-xl"><%= @changeset.changes[:title] || @article.title %></h1>
-      <p class="whitespace-pre-line text-lg"><%= @changeset.changes[:body] || @article.body %></p>
+      <h1 class="font-bold text-xl"><%= @form.source.changes[:title] || @article.title %></h1>
+      <p class="whitespace-pre-line text-lg">
+        <%= @form.source.changes[:body] || @article.body %>
+      </p>
     </article>
     <article
       :if={@live_action != :edit}
@@ -42,7 +44,7 @@
   </div>
   <.form
     :if={@live_action == :edit}
-    for={@changeset}
+    for={@form}
     class="flex flex-col gap-y-4 w-1/3 ml-8"
     phx-submit="submit_article"
     phx-change="edit_article"
@@ -65,7 +67,7 @@
     class="ml-8 w-1/4 gap-y-4 flex flex-col"
   >
     <.form
-      for={@changeset}
+      for={@form}
       class="flex flex-col gap-y-2"
       phx-submit="submit_comment"
       phx-change="change_comment"

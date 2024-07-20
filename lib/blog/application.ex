@@ -11,8 +11,7 @@ defmodule Blog.Application do
       BlogWeb.Telemetry,
       Blog.Repo,
       {Ecto.Migrator,
-        repos: Application.fetch_env!(:blog, :ecto_repos),
-        skip: skip_migrations?()},
+       repos: Application.fetch_env!(:blog, :ecto_repos), skip: skip_migrations?()},
       {DNSCluster, query: Application.get_env(:blog, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Blog.PubSub},
       # Start the Finch HTTP client for sending emails

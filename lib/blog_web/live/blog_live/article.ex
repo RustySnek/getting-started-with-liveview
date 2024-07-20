@@ -1,18 +1,19 @@
 defmodule BlogWeb.BlogLive.Article do
+  alias Blog.Repo
   alias Phoenix.LiveView.AsyncResult
   alias Blog.MyBlog.Article
   use BlogWeb, :live_view
   alias Blog.MyBlog
 
   def handle_event("submit_article", _params, socket) do
-    changeset = socket.assigns.changeset
+    changeset = Map.put(socket.assigns.form.source, :action, :insert)
 
     socket =
-      case MyBlog.create_article(changeset) do
+      case Repo.insert(changeset) do
         {:ok, article} ->
           socket
           |> put_flash(:info, "Article created successfully.")
-          |> assign(:articles, [article | socket.assigns.articles])
+          |> assign(:articles, AsyncResult.ok([article | socket.assigns.articles.result]))
           |> push_patch(to: ~p"/articles")
 
         {:error, %Ecto.Changeset{} = _changeset} ->
@@ -28,10 +29,12 @@ defmodule BlogWeb.BlogLive.Article do
   end
 
   def handle_params(params, _url, %{assigns: %{live_action: :new}} = socket) do
-    changeset = MyBlog.change_article(%Article{}, params)
-    form = to_form(changeset, action: :validate)
-    socket = socket |> assign(:changeset, changeset) |> assign(:form, form)
-    {:noreply, socket}
+    form =
+      %Article{}
+      |> MyBlog.change_article(params)
+      |> to_form(action: :validate)
+
+    {:noreply, assign(socket, :form, form)}
   end
 
   def handle_params(_params, _url, socket) do
@@ -46,7 +49,7 @@ defmodule BlogWeb.BlogLive.Article do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(:articles, AsyncResult.loading())
+      |> assign(:articles, AsyncResult.ok([]) |> AsyncResult.loading())
       |> start_async(:load_articles, fn ->
         :timer.sleep(2_000)
         MyBlog.list_articles()

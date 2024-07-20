@@ -2,10 +2,11 @@ defmodule BlogWeb.BlogLive.ViewArticle do
   alias Blog.MyBlog.Comment
   use BlogWeb, :live_view
   alias Blog.MyBlog
+  alias Blog.Repo
 
   def handle_event("delete_article", _params, socket) do
     article = socket.assigns.article
-    {:ok, _article} = MyBlog.delete_article(article)
+    {:ok, _article} = Repo.delete(article)
 
     socket =
       socket
@@ -16,10 +17,10 @@ defmodule BlogWeb.BlogLive.ViewArticle do
   end
 
   def handle_event("submit_article", _params, socket) do
-    changeset = socket.assigns.changeset
+    changeset = Map.put(socket.assigns.form.source, :action, :update)
 
     socket =
-      case MyBlog.update_article(changeset) do
+      case Repo.update(changeset) do
         {:ok, article} ->
           socket
           |> put_flash(:info, "Article edited successfully.")
@@ -39,21 +40,23 @@ defmodule BlogWeb.BlogLive.ViewArticle do
   end
 
   def handle_event("delete_comment", %{"value" => id}, socket) do
+    case MyBlog.get_comment_by_id(id) do
+      nil -> :ok
+      comment -> Repo.delete(comment)
+    end
+
     comments =
-      socket.assigns.comments
-      |> Enum.reject(fn comment ->
-        unless to_string(comment.id) != id, do: MyBlog.delete_comment(comment)
-      end)
+      socket.assigns.comments |> Enum.reject(&(to_string(Map.get(&1, :id)) == id)) |> dbg
 
     {:noreply, assign(socket, :comments, comments)}
   end
 
   def handle_event("submit_comment", _params, socket) do
     article = socket.assigns.article
-    changeset = socket.assigns.changeset
+    changeset = Map.put(socket.assigns.form.source, :action, :insert)
 
     socket =
-      case MyBlog.create_comment(changeset) do
+      case Repo.insert(changeset) do
         {:ok, comment} ->
           socket
           |> put_flash(:info, "Comment created!")
@@ -79,10 +82,12 @@ defmodule BlogWeb.BlogLive.ViewArticle do
   end
 
   def handle_params(params, _url, %{assigns: %{live_action: :edit, article: article}} = socket) do
-    changeset = MyBlog.change_article(article, params)
-    form = to_form(changeset, action: :validate)
-    socket = socket |> assign(:changeset, changeset) |> assign(:form, form)
-    {:noreply, socket}
+    form =
+      article
+      |> MyBlog.change_article(params)
+      |> to_form(action: :validate)
+
+    {:noreply, assign(socket, :form, form)}
   end
 
   def handle_params(
@@ -99,17 +104,12 @@ defmodule BlogWeb.BlogLive.ViewArticle do
         _url,
         %{assigns: %{live_action: :comments, article: article}} = socket
       ) do
-    changeset =
-      MyBlog.change_comment(%Comment{}, Map.put(params, "article_id", article.id))
+    form =
+      %Comment{}
+      |> MyBlog.change_comment(Map.put(params, "article_id", article.id))
+      |> to_form(action: :validate)
 
-    form = to_form(changeset, action: :validate)
-
-    socket =
-      socket
-      |> assign(:changeset, changeset)
-      |> assign(:form, form)
-
-    {:noreply, socket}
+    {:noreply, assign(socket, :form, form)}
   end
 
   def handle_params(_params, _url, socket) do

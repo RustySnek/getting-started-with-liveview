@@ -14,9 +14,6 @@ defmodule Blog.MyBlog do
   end
 
   defdelegate change_article(article, changes), to: Article, as: :changeset
-  defdelegate create_article(changeset), to: Repo, as: :insert
-  defdelegate update_article(changeset), to: Repo, as: :update
-  defdelegate delete_article(article), to: Repo, as: :delete
 
   def list_comments(limit \\ 10) do
     CommentQueries.base() |> Repo.all(limit: limit)
@@ -31,7 +28,4 @@ defmodule Blog.MyBlog do
   end
 
   defdelegate change_comment(comment, changes), to: Comment, as: :changeset
-  defdelegate create_comment(changeset), to: Repo, as: :insert
-  defdelegate update_comment(changeset), to: Repo, as: :update
-  defdelegate delete_comment(comment), to: Repo, as: :delete
 end
